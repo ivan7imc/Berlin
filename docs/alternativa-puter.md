@@ -1,7 +1,11 @@
 # Avaliação: backend inteiro em Puter Workers (sem Render)
 
-> **⚠️ ARQUIVADA em 2026-09-03 — decisão: não usar Puter** (restrição de custo: a plataforma consome
-> créditos da conta do dono via `me.puter`). O plano ativo é o **[PLANO.md](../PLANO.md)** com Render Free.
+> **⚠️ ARQUIVADA em 2026-09-03 — decisão: não usar Puter.** Motivo informado pelo usuário: **a conta
+> Puter está sem créditos.** Isso confirma na prática o risco R2 desta avaliação — o consumo do worker
+> (KV, FS, `puter.net.fetch()`) é medido na conta do **dono** (`me.puter`), não na de quem chama; a
+> alternativa *user-pays* (`user.puter`) só funciona quando a chamada vem de dentro do Puter, nunca de um
+> cliente externo. **Sem saldo, o worker não roda — inclusive em requisição gratuita.**
+> O plano ativo é o **[PLANO.md](../PLANO.md)** com Render Free.
 > Este documento fica no repositório porque o `spike/src/worker.js` é **portável**: o mesmo arquivo roda
 > em Cloudflare Workers (free tier com limites publicados), Deno Deploy ou Val.town, e a lógica de
 > captura (webhook → store → `/tick`) é reaproveitada sem alteração.

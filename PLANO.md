@@ -794,11 +794,13 @@ O app aponta `webhook` para `https://<worker>.workers.dev/hook` e, ao acordar, v
 
 #### Alternativa arquivada: backend sem Render
 
-A avaliação de levar o backend para **Puter Workers** foi **arquivada** em 2026-09-03 por restrição de
-custo ([docs/alternativa-puter.md](docs/alternativa-puter.md)). O `spike/src/worker.js` produzido nela
-fica no repositório porque é **portável** (Cloudflare Workers, Deno Deploy) e a lógica de captura
-(webhook → store → `/tick`) é reaproveitável. O caminho ativo deste plano é **Render Free + as medidas
-desta seção**, tudo a **US$ 0**.
+A avaliação de levar o backend para **Puter Workers** foi **arquivada** em 2026-09-03: **a conta Puter
+está sem créditos** ([docs/alternativa-puter.md](docs/alternativa-puter.md)). O Puter mede o consumo do
+worker na conta do dono (`me.puter`), então sem saldo nada roda — o que confirma o risco que a própria
+avaliação já previa. O `spike/src/worker.js` fica no repositório porque é **portável** (Cloudflare
+Workers, cujo free tier tem limites publicados e não exige créditos do tipo; Deno Deploy) e a lógica de
+captura (webhook → store → `/tick`) é reaproveitável. O caminho ativo deste plano é **Render Free + as
+medidas desta seção**, tudo a **US$ 0**.
 
 #### O que **não** fazer
 
