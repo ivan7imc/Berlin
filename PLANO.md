@@ -802,6 +802,18 @@ Workers, cujo free tier tem limites publicados e não exige créditos do tipo; D
 captura (webhook → store → `/tick`) é reaproveitável. O caminho ativo deste plano é **Render Free + as
 medidas desta seção**, tudo a **US$ 0**.
 
+#### Alternativa em avaliação: Cloudflare Workers
+
+Nova avaliação aberta em 2026-09-03 — **[docs/alternativa-cloudflare-workers.md](docs/alternativa-cloudflare-workers.md)**.
+Motivo do interesse: o Workers tem **Cron Triggers nativos e gratuitos** (5 por conta) e **não tem
+spin-down**, o que eliminaria de uma vez o vigia externo, o orçamento de instance-hours e o risco de
+cold start no webhook do Horde — ou seja, quatro mecanismos desta seção deixariam de existir. O custo
+seria trocar Python/Flask por JavaScript (~300 linhas) e mudar `r2: false` → **`r2: true`**, porque o
+limite de **10 ms de CPU por requisição** no plano Free não admite o `JSON.parse` de um base64 de
+megabytes. Ponto de atenção: **R2 pede "checkout flow" (forma de pagamento)**, então o v1 usaria
+**D1 + KV** (sem cartão) e R2 ficaria para depois. Decisão pendente (§13 daquele documento); o plano
+segue sendo este até lá.
+
 #### O que **não** fazer
 
 - ❌ Criar um segundo web service free no Render só para ficar pingando: as 750 h são **do workspace**, não por serviço — dois serviços acordados estouram a franquia em ~15 dias.
