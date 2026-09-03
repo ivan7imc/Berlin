@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "berlin",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // O frontend é servido pelo próprio Worker (requisições a assets são gratuitas e ilimitadas)
+  "assets": { "directory": "./public" },
+
+  // Para rodar local os ids podem ser estes placeholders.
+  // Para o deploy, troque pelos ids reais:
+  //   npx wrangler d1 create berlin
+  //   npx wrangler kv:namespace create IMAGES
+  //   npx wrangler kv:namespace create CACHE
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "berlin",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "kv_namespaces": [
+    { "binding": "IMAGES", "id": "00000000000000000000000000000001" },
+    { "binding": "CACHE", "id": "00000000000000000000000000000002" }
+  ],
+
+  "vars": {
+    "CLIENT_AGENT": "berlin/0.1",
+    "RESULT_TTL_HOURS": "24"
+  },
+
+  // O vigia: 1 dos 5 Cron Triggers gratuitos. Sem serviço pago, sem instância acordada.
+  "triggers": { "crons": ["* * * * *"] },
+
+  "observability": { "enabled": true }
+}
