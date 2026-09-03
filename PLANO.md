@@ -157,6 +157,8 @@ resolve o v1 a US$ 0 e sem cartão; a troca são ~15 linhas em `src/images.js`.
 ```
 wrangler.jsonc          config: D1, 2 KV, cron, assets
 schema.sql              jobs + índice
+scripts/
+  setup.mjs             blueprint da instalação — `npm run setup` (§9)
 src/
   index.js              { fetch, scheduled }
   router.js             rotas
@@ -180,6 +182,20 @@ test/
 
 ## 9. Deploy
 
+**Automatizado (o blueprint — recomendado):**
+
+```bash
+npm install
+npm run setup
+```
+
+O `scripts/setup.mjs` faz login → D1 → KV (IMAGES, CACHE) → grava ids no `wrangler.jsonc` →
+aplica o schema → segredo `HORDE_API_KEY` (opcional) → deploy → verificação. É idempotente:
+pode rodar de novo sem duplicar recursos. Em CI/cabeça, use `CLOUDFLARE_API_TOKEN=…` e
+`HORDE_API_KEY=…`. O Cloudflare não tem um `render.yaml`; este script é o equivalente.
+
+**Manual (o que o script faz por baixo dos panos):**
+
 ```bash
 npm install
 npx wrangler login                       # conta Cloudflare gratuita
@@ -193,7 +209,7 @@ npx wrangler d1 execute berlin --remote --file=schema.sql
 npx wrangler secret put HORDE_API_KEY    # nunca vai no arquivo de config
 
 npm run deploy                           # → https://berlin.<sub>.workers.dev
-npx wrangler triggers list               # confirma o cron
+# o cron é registrado no próprio deploy (saída: "Deployed … triggers / schedule: * * * * *")
 ```
 
 O domínio `*.workers.dev` já é HTTPS, que é pré-requisito do webhook do Horde.

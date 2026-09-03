@@ -29,8 +29,35 @@ npm test             # 25 checagens
 
 ## Deploy
 
+O "blueprint" da instalação é o **`npm run setup`**: um comando que faz, na ordem certa e de
+forma idempotente (pode rodar de novo sem duplicar recursos), tudo o que antes era manual:
+
 ```bash
-npx wrangler login
+npm install
+npm run setup
+```
+
+O que ele faz:
+
+1. autentica na Cloudflare (abre o navegador — ou use `CLOUDFLARE_API_TOKEN=… npm run setup` para CI);
+2. cria o banco D1 `berlin` e os namespaces KV `IMAGES` e `CACHE`;
+3. grava os ids em `wrangler.jsonc` (substituindo os placeholders);
+4. aplica `schema.sql` no D1 remoto;
+5. pergunta se quer gravar a `HORDE_API_KEY` como segredo (opcional — anônimo funciona;
+   ou passe `HORDE_API_KEY=… npm run setup`);
+6. faz `wrangler deploy` e confirma o `GET /api/health`.
+
+O Cron Trigger (`* * * * *`) já está declarado em `wrangler.jsonc` e é aplicado no deploy — é o
+equivalente nativo do que, no Render, exigiria um serviço extra. No fim, a URL é
+`https://berlin.<sub>.workers.dev` (HTTPS de fábrica, pré-requisito do webhook do Horde).
+
+> **Por que não existe um `render.yaml` aqui:** o Cloudflare não tem um arquivo único de blueprint
+> que provisione Worker + D1 + KV + Cron. O `scripts/setup.mjs` faz esse papel. Os passos manuais
+> equivalentes (para quem prefere na mão) estão no §9 do [PLANO.md](PLANO.md).
+
+```bash
+npx wrangler login                       # conta Cloudflare gratuita
+
 npx wrangler d1 create berlin            # → database_id
 npx wrangler kv:namespace create IMAGES  # → id
 npx wrangler kv:namespace create CACHE   # → id
