@@ -27,9 +27,7 @@ export async function router(request, env, ctx) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
   try {
-    if (request.method === "GET" && path === "/api/health") {
-      return json({ ok: true, now: Date.now(), horde: env.HORDE_BASE_URL || "https://aihorde.net/api" });
-    }
+    if (request.method === "GET" && path === "/api/health") return health(env, url);
 
     if (request.method === "GET" && path === "/api/limits") {
       return json({
@@ -78,6 +76,40 @@ export async function router(request, env, ctx) {
 }
 
 /* ---------------- rotas ---------------- */
+
+/* Diagnóstico. Nunca devolve a chave — só se existe, se tem sujeira (espaço/quebra
+   de linha) e o que o Horde responde quando ela é usada. ?deep=1 chama /v2/find_user. */
+async function health(env, url) {
+  const raw = env.HORDE_API_KEY;
+  const key = {
+    present: typeof raw === "string" && raw.length > 0,
+    length: typeof raw === "string" ? raw.length : 0,
+    trimmed_clean: typeof raw === "string" ? raw === raw.trim() : null,
+    mode: raw ? "authenticated" : "anonymous",
+  };
+
+  const out = {
+    ok: true,
+    now: Date.now(),
+    horde: env.HORDE_BASE_URL || "https://aihorde.net/api",
+    bindings: { DB: !!env.DB, IMAGES: !!env.IMAGES, CACHE: !!env.CACHE },
+    key,
+  };
+
+  if (url.searchParams.get("deep") === "1") {
+    try {
+      const res = await horde.findUser(env);
+      out.horde_auth =
+        res.status === 200
+          ? { valid: true, username: res.json.username, kudos: res.json.kudos }
+          : { valid: false, status: res.status, message: res.json && res.json.message };
+    } catch (err) {
+      out.horde_auth = { valid: false, error: String((err && err.message) || err) };
+    }
+  }
+
+  return json(out);
+}
 
 async function listModels(env) {
   const key = "models:v1";

@@ -43,6 +43,12 @@ export async function status(env, hordeId) {
   return { status: res.status, json: await asJson(res) };
 }
 
+/* Valida a apikey: devolve o usuário dono da chave (ou 404 "Invalid API Key"). */
+export async function findUser(env) {
+  const res = await fetch(`${base(env)}/v2/find_user`, { headers: headers(env) });
+  return { status: res.status, json: await asJson(res) };
+}
+
 export async function listModels(env) {
   const res = await fetch(`${base(env)}/v2/status/models`, { headers: headers(env) });
   return { status: res.status, json: await asJson(res) };
