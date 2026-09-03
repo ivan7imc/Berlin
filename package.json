@@ -1,0 +1,14 @@
+{
+  "name": "berlin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Edição de imagem por prompt via AI Horde, rodando no Cloudflare Workers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/run-local.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.128.0"
+  }
+}

@@ -1,7 +1,6 @@
-/* Cliente do AI Horde. Tudo é fetch(); espera de rede não consome CPU. */
+/* Cliente do AI Horde. Tudo é fetch(): espera de rede não consome CPU. */
 
 const DEFAULT_BASE = "https://aihorde.net/api";
-
 const base = (env) => String(env.HORDE_BASE_URL || DEFAULT_BASE).replace(/\/+$/, "");
 
 function headers(env, extra = {}) {
@@ -19,7 +18,7 @@ async function asJson(res) {
   try {
     return JSON.parse(text);
   } catch (_) {
-    return { message: text };
+    return { message: text.slice(0, 500) };
   }
 }
 
@@ -32,17 +31,15 @@ export async function submit(env, body) {
   return { status: res.status, json: await asJson(res) };
 }
 
+/* /check é barato (10/s): só diz se terminou, sem trazer as imagens. */
 export async function check(env, hordeId) {
-  const res = await fetch(`${base(env)}/v2/generate/check/${hordeId}`, {
-    headers: headers(env),
-  });
+  const res = await fetch(`${base(env)}/v2/generate/check/${hordeId}`, { headers: headers(env) });
   return { status: res.status, json: await asJson(res) };
 }
 
+/* /status traz as gerações — e é o gargalo: 10 chamadas por minuto. */
 export async function status(env, hordeId) {
-  const res = await fetch(`${base(env)}/v2/generate/status/${hordeId}`, {
-    headers: headers(env),
-  });
+  const res = await fetch(`${base(env)}/v2/generate/status/${hordeId}`, { headers: headers(env) });
   return { status: res.status, json: await asJson(res) };
 }
 
@@ -59,7 +56,7 @@ export async function cancel(env, hordeId) {
   return { status: res.status, json: await asJson(res) };
 }
 
-/* Com r2:true a geração traz uma URL pré-assinada (válida ~30 min) em vez do base64. */
+/* Com r2:true, cada geração traz uma URL pré-assinada em vez do base64. */
 export async function fetchGenerationBytes(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`download da geração falhou: HTTP ${res.status}`);

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Berlin — editar imagem por prompt (AI Horde)</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Berlin</h1>
+      <p class="sub">Edite uma imagem a partir de um prompt, usando a API do AI Horde.</p>
+    </header>
+
+    <main>
+      <!-- 1. Imagem de entrada -->
+      <section class="card">
+        <h2>1. Imagem</h2>
+        <div id="drop" class="drop">
+          <input type="file" id="file" accept="image/*" hidden />
+          <p>Solte uma imagem aqui ou <button type="button" id="pick" class="link">escolha um arquivo</button></p>
+          <p class="hint">PNG, JPEG ou WebP — até ~8 MB (o limite prático é a memória de 128 MB do Worker)</p>
+        </div>
+        <div id="source" class="source hidden">
+          <img id="sourceImg" alt="imagem de entrada" />
+          <div id="meta" class="meta"></div>
+        </div>
+      </section>
+
+      <!-- 2. Parâmetros -->
+      <form id="form" class="card">
+        <h2>2. Parâmetros</h2>
+
+        <fieldset>
+          <legend>Prompt</legend>
+          <label>Prompt <textarea name="prompt" rows="3" placeholder="uma rua cyberpunk à noite, reflexos neon no asfalto molhado"></textarea></label>
+          <label>Prompt negativo <textarea name="negative_prompt" rows="2" placeholder="borrado, marca d'água, texto"></textarea></label>
+          <p class="hint">Os dois são enviados num único campo, separados por <code> ### </code>, como o Horde espera.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Imagem</legend>
+          <div class="grid">
+            <label>Modo
+              <select name="source_processing">
+                <option value="img2img">img2img</option>
+                <option value="inpainting">inpainting</option>
+                <option value="outpainting">outpainting</option>
+                <option value="remix">remix</option>
+              </select>
+            </label>
+            <label>Largura <input type="number" name="width" min="64" max="3072" step="64" value="512" /></label>
+            <label>Altura <input type="number" name="height" min="64" max="3072" step="64" value="512" /></label>
+            <label>Força da edição <input type="number" name="denoising_strength" min="0.01" max="1" step="0.01" value="0.55" /></label>
+          </div>
+          <div id="maskRow" class="hidden">
+            <label>Máscara (preto = preservar, branco = refazer)
+              <input type="file" id="mask" accept="image/*" />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Geração</legend>
+          <label>Modelos <span class="hint">(Ctrl/Cmd para vários)</span>
+            <select name="models" id="models" multiple size="5"></select>
+          </label>
+          <div class="grid">
+            <label>Sampler <select name="sampler_name" id="sampler"></select></label>
+            <label>Scheduler <select name="scheduler" id="scheduler"></select></label>
+            <label>Passos <input type="number" name="steps" min="1" max="500" value="25" /></label>
+            <label>CFG scale <input type="number" name="cfg_scale" min="0" max="100" step="0.5" value="7.5" /></label>
+            <label>Seed <input type="text" name="seed" placeholder="aleatória" /></label>
+            <label>Quantidade (n) <input type="number" name="n" min="1" max="20" value="1" /></label>
+            <label>Clip skip <input type="number" name="clip_skip" min="1" max="12" value="1" /></label>
+          </div>
+          <div class="checks">
+            <label><input type="checkbox" name="karras" checked /> karras</label>
+            <label><input type="checkbox" name="hires_fix" /> hires fix</label>
+            <label><input type="checkbox" name="tiling" /> tiling</label>
+            <label><input type="checkbox" name="transparent" /> fundo transparente</label>
+          </div>
+          <label class="sub-field">Força do hires fix <input type="number" name="hires_fix_denoising_strength" min="0.01" max="1" step="0.01" placeholder="padrão" /></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Pós-processamento</legend>
+          <div class="checks" id="postProcessing"></div>
+          <div class="grid">
+            <label>Ordem <select name="post_processing_order" id="ppOrder"></select></label>
+            <label>Força do facefixer <input type="number" name="facefixer_strength" min="0" max="1" step="0.05" placeholder="padrão" /></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Horde</legend>
+          <div class="checks">
+            <label><input type="checkbox" name="nsfw" /> permitir NSFW</label>
+            <label><input type="checkbox" name="censor_nsfw" checked /> censurar NSFW</label>
+            <label><input type="checkbox" name="trusted_workers" /> só workers confiáveis</label>
+            <label><input type="checkbox" name="validated_backends" /> backends validados</label>
+            <label><input type="checkbox" name="slow_workers" checked /> aceitar workers lentos</label>
+            <label><input type="checkbox" name="extra_slow_workers" /> aceitar muito lentos</label>
+            <label><input type="checkbox" name="worker_blacklist" /> tratar workers como blacklist</label>
+            <label><input type="checkbox" name="shared" /> compartilhar com LAION (−2 kudos)</label>
+            <label><input type="checkbox" name="replacement_filter" checked /> filtro de substituição</label>
+            <label><input type="checkbox" name="allow_downgrade" /> permitir downgrade</label>
+            <label><input type="checkbox" name="disable_batching" /> desabilitar batching</label>
+          </div>
+          <label>Workers (ids separados por vírgula) <input type="text" name="workers" placeholder="vazio = todos" /></label>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" id="estimate">Estimar kudos (grátis)</button>
+          <button type="submit" id="submit" class="primary">Gerar edição</button>
+          <span id="cost" class="cost"></span>
+        </div>
+        <p id="formError" class="error hidden"></p>
+      </form>
+
+      <!-- 3. Status / fila -->
+      <section class="card" id="statusCard">
+        <h2>3. Acompanhamento</h2>
+        <div id="status" class="status"><p class="hint">Nenhum job em andamento.</p></div>
+      </section>
+
+      <!-- 4. Resultado -->
+      <section class="card hidden" id="resultCard">
+        <h2>4. Resultado</h2>
+        <div class="compare">
+          <figure><img id="resultImg" alt="imagem gerada" /><figcaption>Gerada</figcaption></figure>
+          <figure><img id="originalImg" alt="imagem original" /><figcaption>Original</figcaption></figure>
+        </div>
+        <div id="genInfo" class="meta"></div>
+        <div class="actions">
+          <a id="download" class="button primary" download>Baixar PNG</a>
+          <button type="button" id="reuse">Usar como nova original</button>
+          <button type="button" id="again">Gerar de novo (mesma seed)</button>
+        </div>
+      </section>
+
+      <!-- 5. Histórico -->
+      <section class="card">
+        <h2>5. Histórico</h2>
+        <ul id="history" class="history"></ul>
+        <div class="actions">
+          <input type="text" id="resumeId" placeholder="id de um job para retomar" />
+          <button type="button" id="resume">Retomar</button>
+        </div>
+        <p class="hint">O histórico fica no seu navegador (localStorage). O resultado em si fica no servidor por 24 h.</p>
+      </section>
+
+      <!-- 6. API -->
+      <details class="card">
+        <summary><h2>6. API</h2></summary>
+        <p class="hint">Tudo o que a interface faz também está disponível por HTTP:</p>
+        <pre id="apiDocs"></pre>
+      </details>
+    </main>
+
+    <footer>
+      <p>Berlin — Cloudflare Workers + AI Horde. <span id="health"></span></p>
+    </footer>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

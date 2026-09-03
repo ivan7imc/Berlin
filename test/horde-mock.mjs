@@ -176,6 +176,8 @@ export function startMockHorde({ port, completeAfterMs = 1200, imageBytes, expir
       }, state.completeAfterMs);
 
       if (expireMs > 0) setTimeout(() => { job.expired = true; }, expireMs);
+      // dry_run: o Horde não cria job, só devolve o custo estimado
+      if (payload.dry_run) { jobs.delete(id); return json(200, { kudos: 12.3, warnings: [] }); }
       return json(202, { id, kudos: 10.5, warnings: [] });
     }
 
