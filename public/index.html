@@ -64,6 +64,7 @@
           <legend>Geração</legend>
           <label>Modelos <span class="hint">(Ctrl/Cmd para vários)</span>
             <select name="models" id="models" multiple size="5"></select>
+            <span id="modelsHint" class="hint"></span>
           </label>
           <div class="grid">
             <label>Sampler <select name="sampler_name" id="sampler"></select></label>
@@ -131,6 +132,7 @@
           <figure><img id="resultImg" alt="imagem gerada" /><figcaption>Gerada</figcaption></figure>
           <figure><img id="originalImg" alt="imagem original" /><figcaption>Original</figcaption></figure>
         </div>
+        <div id="thumbs" class="thumbs hidden"></div>
         <div id="genInfo" class="meta"></div>
         <div class="actions">
           <a id="download" class="button primary" download>Baixar PNG</a>

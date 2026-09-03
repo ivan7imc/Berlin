@@ -391,6 +391,31 @@ await check("tick() limpa jobs resolvidos fora do TTL", async () => {
   return "job e imagem removidos";
 });
 
+await check("Horde recusando a submissão → 502 e job marcado como erro", async () => {
+  await setMode({ submitStatus: 500 });
+  const { status, json } = await submitEdit({ params: { prompt: "vai falhar" } });
+  assert(status === 502, `status=${status} ${JSON.stringify(json).slice(0, 120)}`);
+  const { json: job } = await getJson(`/api/edits/${json.id}`);
+  assert(job.state === "error", `estado=${job.state}`);
+  assert(/HTTP 500/.test(job.error || ""), `erro=${job.error}`);
+  await setMode({ submitStatus: 0 });
+  return "502 na hora, job em estado de erro";
+});
+
+await check("/status/models fora → 502 com cache frio, e recupera depois", async () => {
+  const del = spawnSync("npx", ["wrangler", "kv", "key", "delete", "--binding=CACHE", "models:v1",
+    "--local", "--persist-to", PERSIST], { encoding: "utf8" });
+  assert(del.status === 0, `wrangler kv key delete falhou: ${del.stderr}`);
+  await setMode({ models: "down" });
+  const cold = await getJson("/api/models");
+  assert(cold.status === 502, `cache frio: status=${cold.status}`);
+
+  await setMode({ models: "ok" });
+  const warm = await getJson("/api/models");
+  assert(warm.status === 200 && warm.json.models.length === 2, `recuperou? status=${warm.status}`);
+  return "502 quando o Horde cai, 200 quando volta";
+});
+
 /* ---------------- 7. desempenho ---------------- */
 
 console.log("\n=== 7. Desempenho (o risco nº 1: 10 ms de CPU) ===\n");

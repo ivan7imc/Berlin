@@ -3,7 +3,7 @@
 Editar uma imagem a partir de um prompt, usando a API do **AI Horde**, rodando inteiro no
 **Cloudflare Workers** (plano gratuito).
 
-**Status:** implementado e validado localmente — `npm test` → **25/25** (workerd real, D1 e KV locais,
+**Status:** implementado e validado localmente — `npm test` → **27/27** (workerd real, D1 e KV locais,
 mock do Horde). Falta apenas o deploy com a conta Cloudflare (§9).
 
 ---
@@ -223,9 +223,11 @@ Kudos do Horde são outra conta: `dry_run: true` não gasta nada e a chave anôn
    bem-sucedido; o navegador faz retry se a imagem der 404.
 4. **URL pré-assinada do Horde expira em 30 min** — a captura acontece em segundos; se falhar, o
    `/status` do tick devolve URL nova.
-5. **App aberto na internet** — qualquer pessoa com a URL gasta os seus kudos. Mitigação gratuita:
+5. **Horde indisponível** — a UI degrada: listas caem para defaults locais, o aviso aparece na tela e o
+   envio ainda funciona quando o Horde volta (testado: `/api/models` → 502 com cache frio, 200 depois).
+6. **App aberto na internet** — qualquer pessoa com a URL gasta os seus kudos. Mitigação gratuita:
    Cloudflare Access (até 50 usuários) na frente do Worker. v1.1.
-6. **Lock-in** — baixo: R2 é compatível com S3, D1 é SQLite (`wrangler d1 export`), e o Worker usa
+7. **Lock-in** — baixo: R2 é compatível com S3, D1 é SQLite (`wrangler d1 export`), e o Worker usa
    só Web APIs.
 
 ---

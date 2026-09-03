@@ -84,7 +84,7 @@ export function startMockHorde({ port, completeAfterMs = 1200, imageBytes, expir
   const events = [];
   const payloads = [];
   const stats = { modelFetches: 0, r2Fetches: 0, webhookAttempts: 0, submits: 0 };
-  const state = { webhook: "ok", completeAfterMs }; // webhook: ok | down
+  const state = { webhook: "ok", completeAfterMs, submitStatus: 0, models: "ok" };
 
   async function deliverWebhook(url, data, jobId, attemptLabel) {
     const target = state.webhook === "down" ? url.replace(/^(https?:\/\/[^/:]+)(:\d+)?/, "http://127.0.0.1:9") : url;
@@ -138,6 +138,9 @@ export function startMockHorde({ port, completeAfterMs = 1200, imageBytes, expir
     // ---- API do Horde ----
     if (req.method === "POST" && url.pathname === "/v2/generate/async") {
       const buf = await bodyBuf();
+      if (state.submitStatus) {
+        return json(state.submitStatus, { message: "recusado de propósito pelo mock" });
+      }
       const payload = JSON.parse(buf.toString() || "{}");
       stats.submits++;
       const id = crypto.randomUUID();
@@ -207,6 +210,7 @@ export function startMockHorde({ port, completeAfterMs = 1200, imageBytes, expir
     }
 
     if (req.method === "GET" && url.pathname === "/v2/status/models") {
+      if (state.models === "down") return json(500, { message: "indisponível" });
       stats.modelFetches++;
       return json(200, [
         { name: "Deliberate", count: 12, performance: 100, queued: 0, eta: 1 },
@@ -236,6 +240,8 @@ export function startMockHorde({ port, completeAfterMs = 1200, imageBytes, expir
       const cfg = JSON.parse(buf.toString() || "{}");
       if (cfg.webhook) state.webhook = cfg.webhook;
       if (cfg.completeAfterMs !== undefined) state.completeAfterMs = cfg.completeAfterMs;
+      if (cfg.submitStatus !== undefined) state.submitStatus = cfg.submitStatus;
+      if (cfg.models) state.models = cfg.models;
       return json(200, { state });
     }
     if (req.method === "GET" && url.pathname === "/__events") return json(200, events);

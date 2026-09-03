@@ -98,3 +98,10 @@ button:disabled { opacity: .6; cursor: default; }
 pre { background: #0c0e13; border: 1px solid var(--line); border-radius: 8px; padding: .75rem; overflow-x: auto; font-size: .8rem; }
 
 footer { max-width: 60rem; margin: 0 auto; padding: 0 1rem 2rem; color: var(--muted); font-size: .85rem; }
+
+.thumbs { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
+.thumbs img {
+  width: 6rem; height: 6rem; object-fit: cover; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px;
+}
+.thumbs img:hover { border-color: var(--accent); }

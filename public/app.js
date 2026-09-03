@@ -275,6 +275,28 @@ function renderStatus(job) {
   el.innerHTML = rows.join("");
 }
 
+/* Com n > 1, cada imagem ganha uma miniatura clicável — senão só a primeira
+   seria visível e o resto ficaria inacessível pela interface. */
+function renderThumbs(job) {
+  const box = $("#thumbs");
+  const urls = job.image_urls || [];
+  if (!urls.length || urls.length < 2) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+  box.innerHTML = urls
+    .map((u, i) => `<img src="${u}&t=${Date.now()}" data-src="${u}" alt="imagem ${i + 1}" title="imagem ${i + 1}">`)
+    .join("");
+  box.classList.remove("hidden");
+  box.querySelectorAll("img").forEach((img) =>
+    img.addEventListener("click", () => {
+      $("#resultImg").src = img.src;
+      $("#download").href = img.getAttribute("data-src");
+    })
+  );
+}
+
 function showResult(job) {
   const url = `/api/edits/${job.id}/image?t=${Date.now()}`;
   $("#resultImg").src = url;
@@ -282,6 +304,7 @@ function showResult(job) {
   $("#download").download = `berlin-${job.id.slice(0, 8)}.png`;
   $("#resultCard").classList.remove("hidden");
 
+  renderThumbs(job);
   const g = (job.generations || [])[0] || {};
   const bits = [];
   if (g.model) bits.push(`modelo: ${g.model}`);
@@ -338,11 +361,30 @@ function hideFormError() { $("#formError").classList.add("hidden"); }
 
 /* ---------------- inicialização ---------------- */
 
+/* Listas de reserva: se o Horde estiver fora, a interface continua utilisável
+   (o Worker aplica "Deliberate" quando nenhum modelo é informado). */
+const FALLBACK_LIMITS = {
+  schedulers: ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform"],
+  post_processing: ["GFPGANv1.3", "4x_AnimeSharp", "4xNomos8kSC", "2xModernSpanimationV1"],
+  post_processing_order: ["facefixers_first", "upscalers_first"],
+};
+
+async function loadJson(path, fallback) {
+  try {
+    const r = await fetch(path);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch (err) {
+    console.warn(`falhou: ${path}`, err);
+    return fallback;
+  }
+}
+
 async function init() {
   // selects vindos do servidor, para a UI não duplicar listas
   const [limits, models] = await Promise.all([
-    fetch("/api/limits").then((r) => r.json()),
-    fetch("/api/models").then((r) => r.json()),
+    loadJson("/api/limits", FALLBACK_LIMITS),
+    loadJson("/api/models", { models: [] }),
   ]);
 
   $("#sampler").innerHTML = SAMPLERS.map((s) => `<option${s === "k_euler" ? " selected" : ""}>${s}</option>`).join("");
@@ -353,15 +395,17 @@ async function init() {
   $("#postProcessing").innerHTML = limits.post_processing
     .map((p) => `<label><input type="checkbox" value="${p}" /> ${p}</label>`).join("");
 
-  $("#models").innerHTML = (models.models || [])
-    .filter((m) => m.name)
-    .sort((a, b) => (b.count || 0) - (a.count || 0))
-    .slice(0, 60)
-    .map((m) => {
-      const selected = m.name === "Deliberate" ? " selected" : "";
-      return `<option${selected}>${m.name}</option>`;
-    })
-    .join("");
+  const modelList = (models.models || []).filter((m) => m.name);
+  $("#models").innerHTML = modelList.length
+    ? modelList
+        .sort((a, b) => (b.count || 0) - (a.count || 0))
+        .slice(0, 60)
+        .map((m) => `<option${m.name === "Deliberate" ? " selected" : ""}>${m.name}</option>`)
+        .join("")
+    : `<option selected>Deliberate</option>`;
+  $("#modelsHint").textContent = modelList.length
+    ? ""
+    : "não foi possível carregar a lista de modelos — o envio usará “Deliberate”";
 
   $("#apiDocs").textContent = [
     "POST /api/edits            multipart: params=<json>, image_b64=<base64>, mask_b64?  → 202 {id}",
