@@ -2,8 +2,9 @@
 
 Avaliação de arquitetura — comparação com o plano ativo ([PLANO.md](../PLANO.md), Flask/Render) e com a
 alternativa arquivada ([alternativa-puter.md](alternativa-puter.md)).
-**Status:** avaliação — nada implementado. **Data:** 2026-09-03. Todos os limites abaixo foram lidos na
-documentação oficial (links na seção 14), não estimados.
+**Status:** **spike local validado — 18/18** em 2026-09-03 (ver §11). O código está em
+`spike-cloudflare/` e roda sem conta Cloudflare. Todos os limites abaixo foram lidos na documentação
+oficial (links na seção 14), não estimados; os números de desempenho são medidos (§11.1).
 
 ---
 
@@ -325,24 +326,52 @@ sistematicamente. Se acontecer, o plano B é Workers Paid (US$ 5/mês, 30 s de C
 
 ## 11. Go / no-go
 
-**O que dá para validar aqui no sandbox, sem conta e sem custo** (o npm é alcançável; `wrangler`
-4.128.0 instala; `wrangler dev` roda o `workerd` local com D1 e KV locais):
+### 11.1 Validado localmente em 2026-09-03 — 18/18 ✅
 
-| # | Teste | Como |
+O spike está em `spike-cloudflare/` e roda **sem conta Cloudflare, sem cartão e sem rede**: o
+`wrangler dev` sobe o `workerd` de verdade, com D1 e KV locais, e um mock do Horde em Node que
+reproduz o `_deliver_webhook` real (timeout de 3 s, 3 tentativas).
+
+```bash
+cd spike-cloudflare && npm install && node run-local.mjs   # ~30 s
+```
+
+| # | Teste | Resultado medido |
 | --- | --- | --- |
-| 1 | Happy path completo | mock do Horde + `POST /api/edits` → webhook → `done` |
-| 2 | Perda do webhook | Horde aborta aos 3 s → job fica `pending` → `scheduled()` recupera |
-| 3 | Expiração | request expirada → estado `expired` com mensagem, não erro genérico |
-| 4 | `r2: true` | payload minúsculo + captura por URL pré-assinada |
-| 5 | Payload | snap-64, ` ### `, `img2img`, `denoising_strength 0.55` |
-| 6 | Cron real | `curl localhost:8787/cdn-cgi/handler/scheduled` no `wrangler dev` |
-| 7 | **CPU por rota** | medir de verdade (é o risco nº 1) |
-| 8 | Imagem servida | gravar no KV local e servir de volta |
+| 1 | Happy path: submissão → webhook → `done` | **1.288 ms** do envio ao resultado |
+| 2 | Webhook respondido dentro do timeout do Horde | **45 ms** (limite: 3.000 ms) |
+| 3 | `r2: true` → um download por URL pré-assinada | 1 fetch de 282 KB |
+| 4 | Bytes servidos de volta | idênticos (sha256) |
+| 5 | Perda do webhook (Horde desiste após 3×3 s) | job fica `pending` — **nada se perde** |
+| 6 | **Cron Trigger recupera o resultado** | `/cdn-cgi/handler/scheduled` → `done` ✅ |
+| 7 | Expiração | estado `expired` + mensagem, não erro genérico |
+| 8 | `n = 2` | `partial` → `done`, 2 imagens |
+| 9 | Prefill sem Pillow (§4 do PLANO) | 500×333 → 512×320; alfa → `inpainting`; `tEXt` do A1111 devolve prompt, steps, sampler, CFG e seed |
+| 10 | Limpeza por TTL | `tick()` apaga o job e a imagem |
+| 11 | Submissão de 3,7 MB | **79 ms** de parede, sem estourar recursos |
+| 12 | **CPU: parse × concatenação** | `request.json()` de 5 MB = **16,0 ms** ❌ (limite: 10 ms) vs `new Blob([...])` = **1,9 ms** ✅ |
+| 13 | Leitura de estado (50 req) | p50 9 ms, p95 13 ms |
 
-**O que só você pode validar** (precisa de conta Cloudflare e rede): deploy real, webhook público do
-Horde, kudos (lembrete: `dry_run: true` custa 0 kudos e valida payload sem gerar nada).
+**O teste 12 é o que decide o desenho.** Com `r2: false`, uma única chamada de webhook consumiria
+16 ms de CPU contra o limite de 10 ms do plano Free — o Worker devolveria `Error 1102` e o resultado
+se perderia justamente no caminho mais importante. Com `r2: true`, o mesmo trabalho custa 1,9 ms.
+Não é micro-otimização: é a diferença entre funcionar e não funcionar.
 
----
+O spike também pegou dois bugs que iriam para produção: o base64 sendo injetado **sem as aspas** no
+JSON (o placeholder fica entre elas) e a captura relendo o job dentro do laço, o que perdia gerações
+quando `n > 1`.
+
+### 11.2 O que só você pode validar (conta Cloudflare + rede)
+
+| # | Teste | Bloqueio |
+| --- | --- | --- |
+| 1 | `wrangler deploy` e o domínio `*.workers.dev` | conta Cloudflare gratuita |
+| 2 | Webhook público do Horde de verdade | rede + uma conta no Horde |
+| 3 | Cron Trigger em produção (UTC, 1/min) |deploy feito |
+| 4 | Consumo real de CPU por rota no painel | deploy + algumas horas de uso |
+
+Nada disso custa dinheiro: `dry_run: true` não gasta kudos e o Workers Free não pede cartão
+(contanto que você não crie bucket no R2 — seção 4).
 
 ## 12. Comparação final
 
@@ -363,15 +392,19 @@ Horde, kudos (lembrete: `dry_run: true` custa 0 kudos e valida payload sem gerar
 
 ## 13. Recomendação
 
-**Avaliar com spike local, não decidir no papel.** A diferença prática em relação ao Puter é que aqui
-eu consigo validar de verdade antes de você gastar um centavo: `wrangler dev` roda local, com D1, KV e
-cron simulados, e o mock do Horde do spike anterior serve sem alteração.
+**Migrar.** O spike local passou 18/18, incluindo os dois pontos que decidiam a questão:
 
-- Se o spike local der verde (especialmente o **teste 7, CPU por rota**): **vale migrar.** O Workers
-  elimina o spin-down, o vigia externo e o orçamento de horas — exatamente os três pontos que mais
-  consumiram o PLANO.md.
-- Se o CPU de 10 ms apertar de forma sistemática: seguir no Render, que tem 30 s de CPU e o plano já
-  está escrito. O spike responde isso em uma tarde.
+- o **Cron Trigger** recupera sozinho um resultado cujo webhook foi perdido (teste 6);
+- o **orçamento de CPU fecha** com folga, desde que `r2: true` e o base64 nunca virem string JS no
+  Worker (teste 12).
+
+O Workers elimina spin-down, vigia externo e orçamento de instance-hours — os três pontos que mais
+consumiram o PLANO.md — e o custo continua **US$ 0 sem cartão** (D1 + KV, sem R2). O que fica em
+aberto (§11.2) não é risco de arquitetura: é só o deploy com a sua conta.
+
+Passo seguinte sugerido: portar o `spike-cloudflare/` para o app de verdade (frontend completo,
+todos os parâmetros na tela, histórico em `localStorage`) mantendo `src/payload.js`, `capture.js` e
+`tick.js` como estão — eles já estão testados.
 
 ---
 

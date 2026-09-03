@@ -5,3 +5,8 @@ venv/
 *.pyc
 .DS_Store
 .spike-store/
+
+# spike Cloudflare Workers
+node_modules/
+.wrangler/
+.wrangler-state/
