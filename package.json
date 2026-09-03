@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "setup": "node scripts/setup.mjs",
     "test": "node test/run-local.mjs"
   },
   "devDependencies": {
