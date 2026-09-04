@@ -55,7 +55,6 @@ export function buildPayload(p = {}, opts = {}) {
       post_processing: pickList(params.post_processing, POST_PROCESSING, "post_processing"),
     },
     models: Array.isArray(p.models) && p.models.length ? p.models : ["Deliberate"],
-    source_image: "__SOURCE_IMAGE__",
     source_processing: sourceProcessing,
     nsfw: bool(p.nsfw, false),
     censor_nsfw: bool(p.censor_nsfw, true),
@@ -94,13 +93,15 @@ export function buildPayload(p = {}, opts = {}) {
   if (params.use_nsfw_censor != null) payload.params.use_nsfw_censor = bool(params.use_nsfw_censor, false);
   if (p.style) payload.style = String(p.style);
   if (p.proxied_account) payload.proxied_account = String(p.proxied_account);
-  if (opts.mask) payload.source_mask = "__SOURCE_MASK__";
 
   return payload;
 }
 
 /* Corpo final: [prefixo, bytes da imagem, sufixo] — zero parse, zero cópia em string.
-   O placeholder fica ENTRE as aspas do JSON, então só o token é substituído. */
+   O placeholder fica ENTRE as aspas do JSON, então só o token é substituído.
+   
+   NOTA: Esta função não é mais usada. Agora enviamos via FormData para o AI Horde.
+ */
 export function buildBody(payload, imagePart, maskPart) {
   const enc = new TextEncoder();
   let rest = JSON.stringify(payload);
