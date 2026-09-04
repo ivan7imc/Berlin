@@ -1,6 +1,6 @@
 import * as store from "./store.js";
 import * as horde from "./horde.js";
-import { buildPayload, buildBody, LIMITS } from "./payload.js";
+import { buildPayload, LIMITS } from "./payload.js";
 import { capture, safeJson } from "./capture.js";
 import { getImage, imageKey } from "./images.js";
 import { tick } from "./tick.js";
@@ -151,11 +151,43 @@ async function createEdit(request, env, url) {
     return json({ error: String(err.message || err) }, 400); // erro de validação é 400, não 500
   }
 
-  const body = buildBody(payload, toBlob(imagePart), maskPart ? toBlob(maskPart) : null);
+  // Construímos o FormData para o Horde
+  // O AI Horde aceita todos os parâmetros como campos individuais do FormData
+  const hordeForm = new FormData();
+  
+  // Adicionamos todos os campos do payload como campos individuais
+  // Campos que são objetos precisam ser serializados como JSON
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null) continue;
+    
+    if (key === 'params' || key === 'models' || key === 'workers') {
+      // Campos que são arrays ou objetos
+      hordeForm.append(key, JSON.stringify(value));
+    } else if (typeof value === 'object') {
+      hordeForm.append(key, JSON.stringify(value));
+    } else {
+      hordeForm.append(key, String(value));
+    }
+  }
+  
+  // Adicionamos a imagem e máscara como arquivos binários
+  // O AI Horde aceita source_image e source_mask como campos de arquivo
+  // O frontend envia a imagem como base64 (string) dentro de um Blob
+  // Precisamos converter de volta para bytes da imagem
+  const imageBlob = await base64ToBlob(imagePart);
+  if (imageBlob) {
+    hordeForm.append("source_image", imageBlob, "source.png");
+  }
+  if (maskPart) {
+    const maskBlob = await base64ToBlob(maskPart);
+    if (maskBlob) {
+      hordeForm.append("source_mask", maskBlob, "mask.png");
+    }
+  }
 
   // dry_run não gera nada: só estima kudos (custa 0)
   if (payload.dry_run) {
-    const res = await horde.submit(env, body);
+    const res = await horde.submit(env, hordeForm, true);
     if (res.status !== 200) return json({ error: "dry_run recusado", horde: res.json }, 502);
     return json({ dry_run: true, kudos: res.json.kudos, warnings: res.json.warnings || [] });
   }
@@ -170,7 +202,7 @@ async function createEdit(request, env, url) {
     nextPollAt: now + 4_000,
   });
 
-  const res = await horde.submit(env, body);
+  const res = await horde.submit(env, hordeForm, true);
   if (res.status !== 202) {
     const detail = JSON.stringify(res.json).slice(0, 400);
     await store.setError(env, id, `Horde recusou (HTTP ${res.status}): ${detail}`, Date.now());
@@ -282,4 +314,22 @@ function toBlob(x) {
   if (x == null) return null;
   if (typeof x === "string") return new Blob([x]);
   return x; // File/Blob: vai direto para o corpo, sem virar string
+}
+
+// Converte um Blob contendo string base64 de volta para Blob com bytes da imagem
+async function base64ToBlob(blobOrFile) {
+  if (!blobOrFile) return null;
+  
+  // Obtém a string base64 do Blob
+  const base64String = await blobOrFile.text();
+  
+  // Decodifica o base64 para bytes
+  // Usamos atob que está disponível em Cloudflare Workers
+  const binaryString = atob(base64String);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  
+  return new Blob([bytes], { type: 'application/octet-stream' });
 }

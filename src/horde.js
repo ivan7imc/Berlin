@@ -5,7 +5,6 @@ const base = (env) => String(env.HORDE_BASE_URL || DEFAULT_BASE).replace(/\/+$/,
 
 function headers(env, extra = {}) {
   const h = {
-    "Content-Type": "application/json",
     "Client-Agent": env.CLIENT_AGENT || "berlin/0.1",
     ...extra,
   };
@@ -22,12 +21,17 @@ async function asJson(res) {
   }
 }
 
-export async function submit(env, body) {
-  const res = await fetch(`${base(env)}/v2/generate/async`, {
+export async function submit(env, body, isFormData = false) {
+  const init = {
     method: "POST",
     headers: headers(env),
     body,
-  });
+  };
+  // Se for FormData, não definimos Content-Type (o navegador/Workers define automaticamente)
+  if (isFormData) {
+    delete init.headers["Content-Type"];
+  }
+  const res = await fetch(`${base(env)}/v2/generate/async`, init);
   return { status: res.status, json: await asJson(res) };
 }
 
